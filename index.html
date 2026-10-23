@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudyMate — Student Voice Assistant</title>
+<style>
+:root{--bg:#0b1020;--panel:#141c31;--panel2:#1b2741;--text:#f4f7ff;--muted:#aab6d3;--accent:#7cdbcf;--accent2:#a9a0ff;--danger:#ffb4b4}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top right,#26345a 0,#0b1020 45%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+main{max-width:1000px;margin:auto;padding:28px 18px 48px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand{font-weight:800;letter-spacing:.2px;font-size:1.25rem}.pill{border:1px solid #394765;border-radius:999px;padding:6px 11px;color:var(--muted);font-size:.8rem}
+h1{font-size:clamp(2rem,6vw,3.3rem);line-height:1.06;margin:34px 0 12px;max-width:720px}h1 span{color:var(--accent)}.sub{color:var(--muted);max-width:680px}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-top:26px}.card{background:rgba(20,28,49,.94);border:1px solid #2a3858;border-radius:20px;padding:20px;box-shadow:0 12px 35px #0002}.card h2{margin:0 0 12px;font-size:1.1rem}.chat{height:290px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0 14px}.bubble{padding:11px 13px;border-radius:14px;max-width:92%;white-space:pre-wrap}.bot{background:var(--panel2);align-self:flex-start}.you{background:#214b55;align-self:flex-end}.muted{color:var(--muted);font-size:.9rem}.controls{display:flex;gap:8px;margin-top:8px}.controls input{min-width:0;flex:1}.input,button{font:inherit;border-radius:11px;border:1px solid #3b4a6b;padding:11px 12px;color:var(--text);background:#0e1629}.input:focus{outline:2px solid var(--accent)}button{cursor:pointer;font-weight:650;background:#263755}button.primary{background:var(--accent);color:#10202b;border-color:transparent}button:hover{filter:brightness(1.12)}button:disabled{opacity:.5;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.actions button{font-size:.9rem}.task{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #2b3855}.task:last-child{border-bottom:0}.task input{margin-top:6px;accent-color:var(--accent)}.task .name{flex:1}.task.done .name{text-decoration:line-through;color:var(--muted)}.tag{display:inline-block;font-size:.75rem;border:1px solid #405172;border-radius:999px;padding:2px 8px;color:var(--muted);margin-top:4px}.empty{padding:24px 8px;text-align:center;color:var(--muted)}.footer{color:var(--muted);font-size:.8rem;margin-top:20px}.notice{font-size:.85rem;color:#c6d3ef;background:#10192b;border-radius:10px;padding:10px 12px;margin-top:12px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.chat{height:250px}main{padding:20px 13px 35px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><div class="brand">✦ StudyMate</div><div class="pill">Student productivity • Prototype</div></div>
+  <h1>Your day, <span>less overwhelming.</span></h1>
+  <p class="sub">A voice-friendly study assistant that turns messy intentions into small next steps. Add tasks, ask for a plan, and mark work complete.</p>
+  <div class="grid">
+    <section class="card">
+      <h2>Talk to StudyMate</h2>
+      <div id="chat" class="chat" aria-live="polite">
+        <div class="bubble bot">Hi! I can help you make a study plan, add a task, or show your priorities. Try “Plan my day” or “Add task: revise loops”.</div>
+      </div>
+      <form id="chatForm" class="controls">
+        <input id="message" class="input" placeholder="Type a request…" autocomplete="off" aria-label="Your request">
+        <button class="primary" type="submit">Send</button>
+      </form>
+      <div class="actions">
+        <button id="voiceBtn" type="button">🎙 Use voice</button>
+        <button id="planBtn" type="button">Make a plan</button>
+        <button id="prioritiesBtn" type="button">My priorities</button>
+        <button id="clearBtn" type="button">Clear chat</button>
+      </div>
+      <div id="voiceStatus" class="muted">Voice input depends on browser support and microphone permission. Typing always works.</div>
+    </section>
+    <aside class="card">
+      <h2>My tasks <span id="taskCount" class="tag">0 open</span></h2>
+      <form id="taskForm" class="controls">
+        <input id="taskInput" class="input" placeholder="e.g. Practice C loops" aria-label="New task">
+        <button class="primary" type="submit">Add</button>
+      </form>
+      <div id="tasks"><div class="empty">No tasks yet. Add one to get started.</div></div>
+      <div class="notice">Demo note: this prototype stores tasks in this browser only. It does not connect to a real Alexa+ service or send your data to a server.</div>
+    </aside>
+  </div>
+  <p class="footer">Built as an independent simulated assistant prototype for learning and demonstration. Not an Amazon product and not affiliated with or endorsed by Amazon.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let tasks = [];
+let nextId = 1;
+function addBubble(text, who='bot'){
+  const el=document.createElement('div'); el.className='bubble '+who; el.textContent=text; $('chat').appendChild(el); $('chat').scrollTop=$('chat').scrollHeight;
+}
+function renderTasks(){
+  const root=$('tasks'); root.innerHTML='';
+  const open=tasks.filter(t=>!t.done).length;
+  $('taskCount').textContent=`${open} open`;
+  if(!tasks.length){root.innerHTML='<div class="empty">No tasks yet. Add one to get started.</div>';return;}
+  tasks.forEach(t=>{
+    const row=document.createElement('div'); row.className='task'+(t.done?' done':'');
+    const check=document.createElement('input'); check.type='checkbox'; check.checked=t.done; check.setAttribute('aria-label','Mark task complete');
+    check.addEventListener('change',()=>{t.done=check.checked;renderTasks();});
+    const content=document.createElement('div');content.className='name';
+    const name=document.createElement('div');name.textContent=t.text;content.appendChild(name);
+    const tag=document.createElement('span');tag.className='tag';tag.textContent=t.done?'Completed':'Next action';content.appendChild(tag);
+    const del=document.createElement('button');del.type='button';del.textContent='×';del.title='Delete task';del.addEventListener('click',()=>{tasks=tasks.filter(x=>x.id!==t.id);renderTasks();});
+    row.append(check,content,del);root.appendChild(row);
+  });
+}
+function addTask(text){
+  text=text.trim().replace(/^["']|["']$/g,'');
+  if(!text)return false;
+  tasks.push({id:nextId++,text,done:false});renderTasks();return true;
+}
+function makePlan(){
+  const open=tasks.filter(t=>!t.done);
+  if(!open.length)return "You have no open tasks yet. Add two or three things you want to get done, and I’ll help organize them.";
+  const list=open.slice(0,3).map((t,i)=>`${i+1}. ${t.text}`).join('\n');
+  return `Here’s a simple plan. Start with one focused 25-minute session, then take a 5-minute break.\n${list}\nAfter each task, mark it complete. This is a suggested order, not a calendar booking.`;
+}
+function priorities(){
+  const open=tasks.filter(t=>!t.done);
+  if(!open.length)return "You’re clear for now. Add your next task when you’re ready.";
+  return `You have ${open.length} open task${open.length===1?'':'s'}. Pick just one to start:\n${open.slice(0,3).map((t,i)=>`${i+1}. ${t.text}`).join('\n')}${open.length>3?'\nFinish these before adding more to your focus list.':''}`;
+}
+function respond(raw){
+  const s=raw.trim(); if(!s)return;
+  addBubble(s,'you');
+  const low=s.toLowerCase();
+  let answer='';
+  if(/^(add task|add|remind me to|create task)\s*[:\-]?\s*/i.test(s)){
+    const task=s.replace(/^(add task|add|remind me to|create task)\s*[:\-]?\s*/i,'');
+    answer=addTask(task)?`Added “${task}” to your task list.`:'Tell me what task to add, for example: “Add task: revise C loops”.';
+  } else if(low.includes('plan my day')||low.includes('make a plan')||low.includes('study plan')||low==='plan'){
+    answer=makePlan();
+  } else if(low.includes('priorit')||low.includes('what should i do')||low.includes('my tasks')||low.includes('what do i have')){
+    answer=priorities();
+  } else if(low.includes('complete')||low.includes('done')){
+    answer='You can mark a task complete by ticking its checkbox in the My tasks panel.';
+  } else if(low.includes('help')||low.includes('what can you do')){
+    answer='Try one of these: “Add task: practice C loops”, “Plan my day”, or “Show my priorities”. You can also use the voice button if your browser supports speech recognition.';
+  } else {
+    answer='I’m a small demo assistant, so I only understand a few task-planning requests. Try “Add task: finish assignment”, “Plan my day”, or “My priorities”.';
+  }
+  addBubble(answer);
+  if('speechSynthesis' in window && $('speakToggle')?.checked){const u=new SpeechSynthesisUtterance(answer);speechSynthesis.speak(u);}
+}
+$('chatForm').addEventListener('submit',e=>{e.preventDefault();respond($('message').value);$('message').value='';});
+$('taskForm').addEventListener('submit',e=>{e.preventDefault();const v=$('taskInput').value;if(addTask(v)){addBubble(`Added “${v.trim()}” to your task list.`);$('taskInput').value='';}});
+$('planBtn').addEventListener('click',()=>{addBubble('Make a plan','you');addBubble(makePlan());});
+$('prioritiesBtn').addEventListener('click',()=>{addBubble('Show my priorities','you');addBubble(priorities());});
+$('clearBtn').addEventListener('click',()=>{$('chat').innerHTML='';addBubble('Chat cleared. Your task list is still here. What would you like to do next?');});
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+$('voiceBtn').addEventListener('click',()=>{
+  if(!SpeechRecognition){$('voiceStatus').textContent='Voice recognition is not supported in this browser. Use the text box instead.';return;}
+  const rec=new SpeechRecognition();rec.lang='en-IN';rec.interimResults=false;rec.maxAlternatives=1;
+  $('voiceStatus').textContent='Listening… speak now.';
+  rec.onresult=e=>{const text=e.results[0][0].transcript;$('message').value=text;$('voiceStatus').textContent=`Heard: “${text}”`;respond(text);$('message').value='';};
+  rec.onerror=e=>{$('voiceStatus').textContent=`Voice input issue (${e.error}). You can type your request instead.`;};
+  rec.onend=()=>{if($('voiceStatus').textContent==='Listening… speak now.')$('voiceStatus').textContent='Voice session ended. Type a request or tap Use voice again.';};
+  rec.start();
+});
+renderTasks();
+</script>
+</body>
+</html>
